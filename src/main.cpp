@@ -5,6 +5,7 @@
 #include <vector>
 #include <psp2/appmgr.h>
 #include <player.h>
+#include <dialogue.h>
 #include <cmath>
 #include <cstdio>
 
@@ -19,10 +20,11 @@ static const int   IDLE_FRAMES   = 11;
 static const int   WALK_ROW      = 0;
 static const int   WALK_FRAMES   = 8;
 static const int   ANIM_SPEED    = 6;     // game frames per animation frame (60 fps)
-static const int   IDLE_DELAY    = 180;   // frames before the idle animation starts
 static const bool  ART_FACES_RIGHT = true; // does the sheet draw him facing right?
 static const float SPRITE_SCALE  = 1.0f;  // scale the sprite up
+static const float PLAYER_SCALE = 1.8f; // scale the player up
 static const float WALK_SPEED    = 3.0f;  // px per frame
+static const float IDLE_LIMIT = 300; // frames before idle animation plays
 
 static const int   BG_W      = 928;
 static const int   BG_H      = 793;
@@ -87,6 +89,7 @@ int main(int argc, char *argv[]) {
 	}
 	vita2d_texture *idleTexture = vita2d_load_PNG_file(playerSprites[0].c_str());
 	vita2d_texture *walkTexture = vita2d_load_PNG_file(playerSprites[4].c_str());
+	vita2d_texture *cross_btn = vita2d_load_PNG_file("app0:assets/ui/buttons/cross_btn.png");
 
 	vita2d_pgf *font = vita2d_load_default_pgf();
 
@@ -97,6 +100,8 @@ int main(int argc, char *argv[]) {
 
 	Character player = Character(960/2, GROUND_Y, 1, "app0:/assets/sprites/player/Idle_2.png"); // Create a player character at (100, GROUND_Y)
 	player.state = Idle;
+	Dialogue forestDialogue("The forest is quieter than it should be.", 700.0f, false);
+	bool dialogueTriggered = false;
 	int animFrame = 0;
 	int animTimer = 0;
 	float cam_x = 0.0f;
@@ -114,10 +119,22 @@ int main(int argc, char *argv[]) {
 		if(pad.buttons & SCE_CTRL_LEFT) dir -= speed;
 		if(pad.buttons & SCE_CTRL_RIGHT) dir += speed;
 
+		if(forestDialogue.active && (pad.buttons & SCE_CTRL_CROSS)) {
+			forestDialogue.active = false;
+		}
 
 		// Analog stick
 		float lx = pad.lx - 128.0f; // Center the value around 0
 		if(lx > 30 || lx < -30) dir += (lx / 128.0f) * speed;
+
+		if (!dialogueTriggered && player.x >= forestDialogue.x) {
+			forestDialogue.active = true;
+			dialogueTriggered = true;
+			forestDialogue.update(forestDialogue.text);
+		}
+		if (forestDialogue.active) {
+			dir = 0;
+		}
 
 		// ----------------------------------------------------------------- READ CONTROLLER INPUT
 
@@ -140,35 +157,47 @@ int main(int argc, char *argv[]) {
 
 		if (player.state == Walking) {
 			player.x += dir;
-			idleTimer = 0;
-			playIdleAnimation = false;
-			if (!wasWalking) {
-				animFrame = 0;
-				animTimer = 0;
-			}
-		} else if (!playIdleAnimation) {
-			animFrame = 0;
-			animTimer = 0;
-			++idleTimer;
-			if (idleTimer >= IDLE_DELAY) {
-				playIdleAnimation = true;
-				idleTimer = 0;
-			}
-		} else if (++animTimer >= ANIM_SPEED) {
-			animTimer = 0;
-			++animFrame;
-			if (animFrame >= IDLE_FRAMES) {
-				animFrame = 0;
-				playIdleAnimation = false;
-			}
 		}
-
-		if (player.state == Walking && ++animTimer >= ANIM_SPEED) {
-			animTimer = 0;
-			animFrame = (animFrame + 1) % WALK_FRAMES;
-		}
-
 		cam_x = player.x - SCREEN_W / 2.0f;
+
+		if(player.state == Idle && idleTimer >= IDLE_LIMIT) {
+			playIdleAnimation = true;
+			idleTimer = 0; // Reset the idle timer after triggering the idle animation
+			animFrame = 0; // Reset the animation frame for the idle animation
+			animTimer = 0; // Reset the animation timer for the idle animation
+		} else if(player.state == Walking && wasWalking) {
+			idleTimer = 0; // Reset the idle timer if the player starts walking
+			playIdleAnimation = false; // Stop the idle animation if the player starts walking
+			if(animTimer >= ANIM_SPEED) {
+				animFrame = (animFrame + 1) % WALK_FRAMES;
+				animTimer = 0;
+			} else {
+				animTimer++;
+			}
+		} else if(player.state == Walking && !wasWalking) {
+			playIdleAnimation = false; // Stop the idle animation if the player starts walking
+			animFrame = 0; // Reset the animation frame when starting to walk
+			animTimer = 0; // Reset the animation timer when starting to walk
+			idleTimer = 0; // Reset the idle timer if the player starts walking
+		} else if(player.state == Idle && wasWalking){
+			idleTimer =0;
+			animFrame = 0; // Reset the animation frame for the idle animation
+			animTimer = 0; // Reset the animation timer for the idle animation
+		} else if(player.state == Idle && playIdleAnimation) {
+			if(idleTimer >= ANIM_SPEED * IDLE_FRAMES) {
+				idleTimer = 0; // Reset the idle timer after completing the idle animation
+				playIdleAnimation = false; // Stop the idle animation after completing it
+			} else {
+				idleTimer++;
+				animTimer++; // Increment the animation timer for the idle animation
+				if(animTimer >= ANIM_SPEED) {
+					animFrame = (animFrame + 1) % IDLE_FRAMES;
+					animTimer = 0;
+				}
+			}
+		} else {
+			idleTimer++;
+		}
 
         // if (player.y < 0) player.y = 0;
         // if (player.y > SCREEN_H - FRAME_H * SPRITE_SCALE) player.y = SCREEN_H - FRAME_H * SPRITE_SCALE;
@@ -189,13 +218,13 @@ int main(int argc, char *argv[]) {
 		vita2d_texture *player_img = (player.state == Walking) ? walkTexture : idleTexture;
 
 		if(player_img){
-			float w = FRAME_W * SPRITE_SCALE;
-			float h = FRAME_H * SPRITE_SCALE;
+			float w = FRAME_W * PLAYER_SCALE;
+			float h = FRAME_H * PLAYER_SCALE;
 			float left =  player.x - cam_x;
 			float top = GROUND_Y - h;
 
 			bool flip = !player.facingRight;
-			vita2d_draw_texture_part_scale(player_img,flip ? left+w : left, top, FRAME_W * animFrame, 0, FRAME_W, FRAME_H, SPRITE_SCALE * (flip ? -1.0f : 1.0f), SPRITE_SCALE);
+			vita2d_draw_texture_part_scale(player_img,flip ? left+w : left, top, FRAME_W * animFrame, 0, FRAME_W, FRAME_H, PLAYER_SCALE * (flip ? -1.0f : 1.0f), PLAYER_SCALE);
 		} else {
 			vita2d_draw_rectangle(dir - 20, GROUND_Y - 80, 40, 80, RGBA8(255, 0, 0, 255)); // fallback
 		}
@@ -204,6 +233,30 @@ int main(int argc, char *argv[]) {
 			if (!backgroundLayers[i].front || !backgroundLayers[i].tex) continue;
 			float offsetX = cam_x * backgroundLayers[i].scroll;
 			drawLayer(backgroundLayers[i].tex, offsetX, (SCREEN_W - BG_W) / 2.0f, -BG_CROP_Y, 0, 0, BG_W, BG_H, BG_SCALE);
+		}
+
+		if (forestDialogue.active) {
+			vita2d_draw_rectangle(40, 390, 880, 120, RGBA8(20, 18, 24, 235));
+			forestDialogue.animateDialogue(
+				forestDialogue,
+				font,
+				nullptr,
+				RGBA8(255, 255, 255, 255),
+				55,
+				410
+			);
+			float btnSize = 40.0f;
+			if (cross_btn) {
+				vita2d_draw_texture_part_scale(
+					cross_btn,
+					920 - btnSize - 10,  // x
+					510 - btnSize - 10,  // y
+					0, 0,
+					480, 480,
+					btnSize / 480.0f,
+					btnSize / 480.0f
+				);
+			}
 		}
 
 		vita2d_end_drawing();
@@ -215,6 +268,7 @@ int main(int argc, char *argv[]) {
 	vita2d_fini();
 	vita2d_free_texture(idleTexture);
 	vita2d_free_texture(walkTexture);
+	vita2d_free_texture(cross_btn);
 	for (int i = 0; i < BACKGROUND_LAYER_COUNT; ++i) {
 		if (backgroundLayers[i].tex) {
 			vita2d_free_texture(backgroundLayers[i].tex);
