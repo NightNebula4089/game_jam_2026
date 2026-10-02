@@ -15,17 +15,17 @@ endif()
 
 ## Define project parameters here
 # Name of the project
-project(moving_box)
+project(test_game)
 # This line adds Vita helper macros, must go after project definition in order
 # to build Vita specific artifacts (self/vpk).
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
 ## Configuration options for this app
 # Display name (under bubble in LiveArea)
-set(VITA_APP_NAME "Moving box")
+set(VITA_APP_NAME "Test Game")
 # Unique ID must be exactly 9 characters. Recommended: XXXXYYYYY where X =
 # unique string of developer and Y = a unique number for this app
-set(VITA_TITLEID  "NNEB00001")
+set(VITA_TITLEID  "NNEB00301")
 # Optional version string to show in LiveArea's more info screen
 set(VITA_VERSION  "01.00")
 
@@ -37,9 +37,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d PARENTAL_LEVEL=1")
 
 # Add any additional include paths here
-include_directories(
-  ../common # This is for debugScreenPrintf(), you shouldn't need it in your projects
-)
+include_directories(src)
+file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/*.h)
 
 # Add any additional library paths here
 # ${CMAKE_CURRENT_BINARY_DIR} lets you use any library currently being built
@@ -49,9 +48,7 @@ link_directories(
 
 ## Build and link
 # Add all the files needed to compile here
-add_executable(${PROJECT_NAME}
-  src/main.cpp
-)
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 # Library to link to (drop the -l prefix). This will mostly be stubs.
 target_link_libraries(${PROJECT_NAME}
@@ -72,6 +69,13 @@ target_link_libraries(${PROJECT_NAME}
   c
 )
 
+# Pack everything under assets/ into the VPK (re-run cmake after adding files)
+file(GLOB_RECURSE ASSET_FILES RELATIVE ${CMAKE_SOURCE_DIR} assets/*)
+set(VPK_ASSETS "")
+foreach(f ${ASSET_FILES})
+  list(APPEND VPK_ASSETS FILE ${f} ${f})
+endforeach()
+
 ## Create Vita files
 vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME})
 # The FILE directive lets you add additional files to the VPK, the syntax is
@@ -83,4 +87,5 @@ vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
   FILE sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
   FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
   FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
+  ${VPK_ASSETS}
 )
