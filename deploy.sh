@@ -1,5 +1,5 @@
 #!/bin/bash
-VITA_IP=192.168.137.141
+VITA_IP=192.168.137.76
 NAME=test_game
 cmake -B build
 cmake --build build && \

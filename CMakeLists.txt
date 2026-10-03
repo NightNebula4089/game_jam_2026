@@ -62,6 +62,7 @@ target_link_libraries(${PROJECT_NAME}
   ScePgf_stub
   ScePvf_stub
   freetype
+  bz2
   png
   jpeg
   z
