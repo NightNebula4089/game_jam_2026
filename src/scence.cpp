@@ -8,6 +8,7 @@
 #include <player.h>
 #include <scene.h>
 #include <cmath>
+#include <vision.h>
 
 void Scene::addDialogue(const Dialogue &dialogue) {
     dialogues.push_back(dialogue);
@@ -27,6 +28,10 @@ void Scene::setParallaxEnabled() {
 
 void Scene::unsetParallaxEnabled() {
     parallaxEnabled = false;
+}
+
+void Scene::setPointClickEnabled() {
+    pointClickEnabled = true;
 }
 
 void Scene::releaseBackgroundTextures() {
@@ -90,7 +95,7 @@ static void drawInteractPrompt(vita2d_pgf *font, vita2d_texture *icon, const cha
     vita2d_pgf_draw_text(font, x, baseline, white, scale, after);
 }
 
-void Scene::drawScene(Character &player, vita2d_texture *idleTexture,
+void Scene::drawScene(Character &player, vita2d_texture *deadTexture, vita2d_texture *idleTexture,
                       vita2d_texture *walkTexture, float cameraX, float groundY,
                       vita2d_pgf *font, vita2d_texture *crossButton) {
     static const int FRAME_W = 128;
@@ -98,6 +103,7 @@ void Scene::drawScene(Character &player, vita2d_texture *idleTexture,
     static const int IDLE_FRAMES = 11;
     static const int WALK_FRAMES = 8;
     static const int ANIM_SPEED = 6;
+    static const int DEAD_FRAMES = 4;
     static const int IDLE_LIMIT = 300;
     static const float PLAYER_SCALE = 2.5f;
     static const int SCREEN_W = 960;
@@ -113,14 +119,21 @@ void Scene::drawScene(Character &player, vita2d_texture *idleTexture,
 
     Interactable *activeInteractable = nullptr;
     for (auto &interactable : interactables) {
-        const bool inRange =
-            player.x >= interactable.x - interactable.range &&
-            player.x <= interactable.x + interactable.width + interactable.range &&
-            player.y >= interactable.y - interactable.range &&
-            player.y <= interactable.y + interactable.height + interactable.range;
-        if (inRange) {
-            activeInteractable = &interactable;
-            break;
+        if (pointClickEnabled) {
+            if (interactable.active) {
+                activeInteractable = &interactable;
+                break;
+            }
+        } else {
+            const bool inRange =
+                player.x >= interactable.x - interactable.range &&
+                player.x <= interactable.x + interactable.width + interactable.range &&
+                player.y >= interactable.y - interactable.range &&
+                player.y <= interactable.y + interactable.height + interactable.range;
+            if (inRange) {
+                activeInteractable = &interactable;
+                break;
+            }
         }
     }
 
@@ -165,9 +178,23 @@ void Scene::drawScene(Character &player, vita2d_texture *idleTexture,
         }
     }
 
+    if (!pointClickEnabled) {
     const bool walking = player.state == Walking;
+    const bool dead  = player.state == Dead;
 
-    if (walking) {
+    if (!dead) wasDead = false;
+
+    if (dead) {
+        playIdleAnimation = false;
+        if (!wasDead) {
+            wasDead  = true;
+            animFrame = 0;
+            animTimer = 0;
+        } else if (++animTimer >= ANIM_SPEED) {
+            animTimer = 0;
+            if (animFrame < DEAD_FRAMES - 1) ++animFrame;
+        }
+    } else if (walking) {
         idleTimer = 0;
         playIdleAnimation = false;
 
@@ -198,9 +225,9 @@ void Scene::drawScene(Character &player, vita2d_texture *idleTexture,
         }
     }
 
-    vita2d_texture *playerTexture = walking ? walkTexture : idleTexture;
+    vita2d_texture *playerTexture = player.state == Dead ? deadTexture : walking ? walkTexture : idleTexture;
     if (playerTexture) {
-        const int frame = walking || playIdleAnimation ? animFrame : 0;
+        const int frame = (walking || playIdleAnimation || dead) ? animFrame : 0;
         const float width = FRAME_W * PLAYER_SCALE;
         const float height = FRAME_H * PLAYER_SCALE;
         float screenX = parallaxEnabled ? player.x - cameraX : player.x;
@@ -220,6 +247,8 @@ void Scene::drawScene(Character &player, vita2d_texture *idleTexture,
             PLAYER_SCALE
         );
     }
+        wasWalking = walking;
+    }
 
     for(auto &interactable : interactables) {
         if (interactable.spritePath.empty()) continue;
@@ -229,10 +258,25 @@ void Scene::drawScene(Character &player, vita2d_texture *idleTexture,
         if (interactable.texture) {
             float screenX = parallaxEnabled ? interactable.x - cameraX : interactable.x;
             vita2d_draw_texture(interactable.texture, screenX, interactable.y);
+        } else if (pointClickEnabled) {
+            const float screenX = interactable.x;
+            vita2d_draw_rectangle(
+                screenX,
+                interactable.y,
+                interactable.width,
+                interactable.height,
+                RGBA8(180, 40, 40, 255)
+            );
         }
     }
 
-    if(activeInteractable){
+    if(!pointClickEnabled) {
+        drawVision(player.x,player.y,player.health / max_health);
+    } else {
+        drawVision(SCREEN_W/2.0f,SCREEN_H/2.0f,player.health / max_health);
+    }
+
+    if (activeInteractable && !pointClickEnabled && !activeInteractable->dialogue.active) {
         drawInteractPrompt(font, crossButton, activeInteractable->name.c_str());
     }
 
@@ -295,6 +339,4 @@ void Scene::drawScene(Character &player, vita2d_texture *idleTexture,
             );
         }
     }
-
-    wasWalking = walking;
 }

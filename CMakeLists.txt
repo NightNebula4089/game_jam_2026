@@ -54,6 +54,7 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME}
   vita2d
   SceDisplay_stub
+  SceTouch_stub 
   SceGxm_stub
   SceAppMgr_stub
   SceCtrl_stub

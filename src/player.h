@@ -10,8 +10,7 @@
 #include <cstdio>
 #include <string>
 
-#define health_pen 5
-#define max_health 100
+#define max_health 100.0f
 
 
 enum PlayerState {
@@ -45,7 +44,7 @@ struct Inventory {
 struct Character {
     float x;
     float y;
-    int health;
+    float health;
     Inventory inventory; // Each character has an inventory
     int isPlayer; // 1 for player, 0 otherwise
     PlayerState state;
