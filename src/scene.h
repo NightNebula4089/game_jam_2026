@@ -9,6 +9,7 @@
 #include <psp2/appmgr.h>
 #include <dialogue.h>
 #include <cstdio>
+#include <functional>
 #include <string>
 
 struct Scene;
@@ -19,25 +20,43 @@ struct Interactable {
     float y;
     float width;
     float height;
-    float range; // Range within which the player can interact with this object
-    Dialogue dialogue; // Dialogue associated with this interactable
-    std::string spritePath; // Path to the sprite representing the interactable
+    float range;                 // how close the player must be (walking scenes)
+    Dialogue dialogue;           // what is shown while interacting
+    std::string spritePath;      // sprite drawn for this interactable ("" = invisible)
     vita2d_texture *texture;
-    bool active; // Is the interactable currently active
-    bool pickable; // Can the player collect this interactable?
-    Scene *scene; // Scene to enter after this dialogue completes
+    bool active;                 // set by main.cpp every frame
+    bool pickable;               // goes into the inventory when interacted with
+    Scene *scene;                // scene to enter after the dialogue finishes
+    std::vector<std::string> openText;     // lines shown normally
+    std::vector<std::string> closedText;   // lines shown when requiredItem is missing
+    std::string requiredItem;              // "" = nothing required
+    std::function<void()> onInteract;      // runs when the normal dialogue finishes
+    bool runLocked;              // true while the "item missing" lines are showing
+    bool enabled;                // disabled interactables are invisible and ignore input
+    bool removeAfterDialogue;    // picked-up item is removed after its pickup message
 
-    Interactable(const std::string &name, float x, float y, float width, float height, const Dialogue &dialogue, float range, const std::string &spritePath, bool pickable = false, Scene *scene = nullptr)
-        : name(name), x(x), y(y), width(width), height(height), dialogue(dialogue), range(range), spritePath(spritePath), texture(nullptr), active(false), pickable(pickable), scene(scene) {}
+    Interactable(const std::string &name, float x, float y, float width, float height,
+                 const Dialogue &dialogue, float range, const std::string &spritePath,
+                 bool pickable = false, Scene *scene = nullptr,
+                 const std::vector<std::string> &closedText = {},
+                 const std::string &requiredItem = "",
+                 std::function<void()> onInteract = nullptr,
+                 bool runLocked = false)
+        : name(name), x(x), y(y), width(width), height(height), range(range),
+          dialogue(dialogue), spritePath(spritePath), texture(nullptr), active(false),
+          pickable(pickable), scene(scene), openText(dialogue.text),
+          closedText(closedText), requiredItem(requiredItem),
+          onInteract(onInteract), runLocked(runLocked), enabled(true),
+          removeAfterDialogue(false) {}
 };
 
 struct Scene {
     std::string name;
     std::vector<Dialogue> dialogues;
     std::string backgroundImagePath;
-    bool parallaxEnabled = false; // Enable or disable parallax scrolling
-    bool pointClickEnabled = false; // Use touch-screen interactables instead of player movement
-    std::vector<std::string> backgroundLayers; // Background layers associated with this interactable
+    bool parallaxEnabled = false;       // scrolling layered background
+    bool pointClickEnabled = false;     // touch-screen close-up instead of walking
+    std::vector<std::string> backgroundLayers;
     std::vector<vita2d_texture *> backgroundTextures;
     vita2d_texture *backgroundTexture = nullptr;
     std::vector<Interactable> interactables;
@@ -47,13 +66,16 @@ struct Scene {
     bool playIdleAnimation = false;
     bool wasWalking = false;
     bool wasDead = false;
-    float left_border; // minimum x positiqon for the player
-    float right_border; // maximum x position for the player
+    float left_border;                  // minimum x for the player
+    float right_border;                 // maximum x for the player
     float entryX = 480.0f;
     float entryY = 400.0f;
+    float deathDistance = 0.0f;         // maximum distance from entry before death
 
-    Scene(const std::string &name, const std::string &backgroundImagePath,float left_border, float right_border)
-        : name(name), backgroundImagePath(backgroundImagePath), left_border(left_border), right_border(right_border) {}
+    Scene(const std::string &name, const std::string &backgroundImagePath,
+          float left_border, float right_border)
+        : name(name), backgroundImagePath(backgroundImagePath),
+          left_border(left_border), right_border(right_border) {}
 
     void addDialogue(const Dialogue &dialogue);
     void setParallaxEnabled();
@@ -62,12 +84,12 @@ struct Scene {
     void setPointClickEnabled();
     void releaseBackgroundTextures();
     void addInteractable(const Interactable &interactable);
-    void drawScene(Character &player,vita2d_texture *deadTexture, vita2d_texture *idleTexture,
+    void setBackground(const std::string &path);          // swap the background image
+    Interactable *find(const std::string &name);          // nullptr if not found
+    void drawScene(Character &player, vita2d_texture *deadTexture, vita2d_texture *idleTexture,
                    vita2d_texture *walkTexture, float cameraX, float groundY,
                    vita2d_pgf *font, vita2d_texture *crossButton);
-
 };
-
 
 struct Fade {
     float t = 1.0f, duration = 1.0f;     // progress 0..1 and length in frames
@@ -95,4 +117,3 @@ struct Fade {
 };
 
 #endif
-

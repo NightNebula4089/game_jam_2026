@@ -21,12 +21,12 @@ enum GameStateEnum {
 };
 
 struct GameState {
-    Character player;
-    Scene currentScene;
     GameStateEnum state;
+    bool holeOpen = false, 
+    gameWon = false;
 
-    GameState(Character player, Scene currentScene, GameStateEnum state)
-        : player(player), currentScene(currentScene), state(state) {}
+    explicit GameState(GameStateEnum state)
+        :  state(state) {};
 };
 
 #endif

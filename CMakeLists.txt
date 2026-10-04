@@ -53,6 +53,9 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 # Library to link to (drop the -l prefix). This will mostly be stubs.
 target_link_libraries(${PROJECT_NAME}
   vita2d
+  soloud
+  pthread
+  SceAudio_stub
   SceDisplay_stub
   SceTouch_stub 
   SceGxm_stub
