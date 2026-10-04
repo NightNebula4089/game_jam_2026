@@ -12,6 +12,7 @@
 #include <cmath>
 #include <world.h>
 #include <episode.h>
+#include <sfx.h>
 #include <cstdio>
 
 static const int SCREEN_W = 960;
@@ -34,6 +35,7 @@ static const float FADE_SECONDS  = 1.5f;
 static const float HEALTH_DECREASE_RATE = 0.005f; // Health decrease rate per frame
 static const float MOVEMENT_HEALTH_PENALTY = 0.02f; // Health penalty per frame while moving
 static const int DEATH_TIME_LIMIT = 600;
+static const int FOOTSTEP_FRAMES = WALK_FRAMES * ANIM_SPEED / 2; // two steps per walk cycle
 
 static const int   BG_W      = 928;
 static const int   BG_H      = 793;
@@ -72,6 +74,7 @@ int main(int argc, char *argv[]) {
 
 	vita2d_init();
 	vita2d_set_clear_color(RGBA8(0, 0, 0, 255));
+	sfxInit();
 	vita2d_texture *idleTexture = vita2d_load_PNG_file(playerSprites[0].c_str());
 	vita2d_texture *walkTexture = vita2d_load_PNG_file(playerSprites[4].c_str());
 	vita2d_texture *deadTexture = vita2d_load_PNG_file(playerSprites[5].c_str());
@@ -230,6 +233,7 @@ int main(int argc, char *argv[]) {
 	unsigned int pressed = 0;
 	unsigned int released = 0;
 	unsigned int dead_timer = 0;
+	int footstepTimer = 0;
 	bool touchWasDown = false;
 	bool inventoryOpen = false;
 	int selectedInventoryItem = 0;
@@ -503,6 +507,10 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (player.state == Walking) {
+			if (footstepTimer-- <= 0) {   // first step right away, then in time with the walk cycle
+				sfxFootstep();
+				footstepTimer = FOOTSTEP_FRAMES - 1;
+			}
 			player.x += dir;
 			player.y += 0; // No vertical movement
 			player.health -= MOVEMENT_HEALTH_PENALTY; // Decrease health when moving
@@ -512,6 +520,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		cam_x = player.x - SCREEN_W / 2.0f;
+
+		if (player.state != Walking) footstepTimer = 0;
 
 		player.health -= HEALTH_DECREASE_RATE;
 		if(player.health <= 0) {
@@ -534,6 +544,7 @@ int main(int argc, char *argv[]) {
 		else episodeResume(EPISODE_PAUSE_DIALOGUE);
 
 		episodeUpdate(player.state != Dead);
+		if (episodeJustStarted()) sfxPlay(SFX_HURT);   // he groans as the dizzy spell hits
 		if (episodeBlur() > 0.0f && episodeTarget()) {
 			// Draw the scene offscreen, then put it on screen blurred
 			vita2d_start_drawing_advanced(episodeTarget(), 0);
@@ -589,6 +600,7 @@ int main(int argc, char *argv[]) {
 		// ----------------------------------------------------------------- DRAWING
 	}
 
+	sfxShutdown();
 	vita2d_fini();
 	vita2d_free_texture(idleTexture);
 	vita2d_free_texture(walkTexture);

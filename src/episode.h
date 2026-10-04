@@ -18,6 +18,7 @@ bool episodePaused();
 
 void episodeUpdate(bool alive);   // call once per frame while playing
 void episodeReset();              // restart the interval (e.g. on a new game)
+bool episodeJustStarted();        // true only on the frame an episode begins
 float episodePulse();             // 0..1 heartbeat strength this frame
 float episodeBlur();              // 0..1 blur strength this frame
 float episodeVisionScale();       // multiply the vision radius by this (< 1 on a heartbeat)

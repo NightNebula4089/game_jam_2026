@@ -10,12 +10,13 @@ static const float DOUBLE_VISION    = 8.0f;     // px drift of the ghost image a
 static const float HEARTBEAT_SQUEEZE = 0.22f;   // how far a heartbeat closes the vision mask (0..1)
 static const float PI = 3.14159265f;
 
-float episodeIntervalSeconds = 2.0f;           // TESTING: set to 10.0f
+float episodeIntervalSeconds = 10.0f;
 
 static int intervalTimer = 0;
 static int episodeFrame  = EPISODE_FRAMES;      // >= EPISODE_FRAMES means no episode running
 static vita2d_texture *target = nullptr;
 static unsigned int pauseReasons = 0;
+static bool justStarted = false;
 
 // Gaussian bump centred on frame c
 static float beat(float t, float c, float width) {
@@ -28,16 +29,21 @@ void episodeResume(unsigned int reason) { pauseReasons &= ~reason; }
 bool episodePaused()                    { return pauseReasons != 0; }
 
 void episodeUpdate(bool alive) {
+    justStarted = false;
     if (episodePaused()) return;          // paused time does not count
     if (!alive) { episodeFrame = EPISODE_FRAMES; return; }
     if (episodeFrame < EPISODE_FRAMES) ++episodeFrame;
     if (++intervalTimer >= (int)(episodeIntervalSeconds * 60.0f)) {
         intervalTimer = 0;
         episodeFrame  = 0;
+        justStarted   = true;
     }
 }
 
+bool episodeJustStarted() { return justStarted; }
+
 void episodeReset() {
+    justStarted   = false;
     intervalTimer = 0;
     episodeFrame  = EPISODE_FRAMES;
 }
