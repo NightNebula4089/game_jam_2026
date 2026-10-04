@@ -63,8 +63,9 @@ struct Scene {
     void releaseBackgroundTextures();
     void addInteractable(const Interactable &interactable);
     void drawScene(Character &player,vita2d_texture *deadTexture, vita2d_texture *idleTexture,
-                   vita2d_texture *walkTexture, float cameraX, float groundY,
-                   vita2d_pgf *font, vita2d_texture *crossButton);
+                   vita2d_texture *walkTexture, float cameraX, float groundY);
+    void drawDialogue(const Character &player, vita2d_pgf *font, vita2d_texture *crossButton);
+    Interactable *findActiveInteractable(const Character &player);
 
 };
 

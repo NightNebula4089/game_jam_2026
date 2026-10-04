@@ -95,28 +95,7 @@ static void drawInteractPrompt(vita2d_pgf *font, vita2d_texture *icon, const cha
     vita2d_pgf_draw_text(font, x, baseline, white, scale, after);
 }
 
-void Scene::drawScene(Character &player, vita2d_texture *deadTexture, vita2d_texture *idleTexture,
-                      vita2d_texture *walkTexture, float cameraX, float groundY,
-                      vita2d_pgf *font, vita2d_texture *crossButton) {
-    static const int FRAME_W = 128;
-    static const int FRAME_H = 128;
-    static const int IDLE_FRAMES = 11;
-    static const int WALK_FRAMES = 8;
-    static const int ANIM_SPEED = 6;
-    static const int DEAD_FRAMES = 4;
-    static const int IDLE_LIMIT = 300;
-    static const float PLAYER_SCALE = 2.5f;
-    static const int SCREEN_W = 960;
-    static const int SCREEN_H = 544;
-    static const int BG_W = 928;
-    static const int BG_H = 793;
-    static const float BG_SCALE = 1.0f;
-    static const float BG_CROP_Y = 249.0f;
-    static const float layerScroll[] = {
-        0.0f, 0.3f, 0.5f, 0.5f, 0.7f, 0.8f,
-        0.8f, 0.85f, 0.9f, 1.0f, 1.0f
-    };
-
+Interactable *Scene::findActiveInteractable(const Character &player) {
     Interactable *activeInteractable = nullptr;
     for (auto &interactable : interactables) {
         if (pointClickEnabled) {
@@ -136,6 +115,30 @@ void Scene::drawScene(Character &player, vita2d_texture *deadTexture, vita2d_tex
             }
         }
     }
+
+    return activeInteractable;
+}
+
+void Scene::drawScene(Character &player, vita2d_texture *deadTexture, vita2d_texture *idleTexture,
+                      vita2d_texture *walkTexture, float cameraX, float groundY) {
+    static const int FRAME_W = 128;
+    static const int FRAME_H = 128;
+    static const int IDLE_FRAMES = 11;
+    static const int WALK_FRAMES = 8;
+    static const int ANIM_SPEED = 6;
+    static const int DEAD_FRAMES = 4;
+    static const int IDLE_LIMIT = 300;
+    static const float PLAYER_SCALE = 2.5f;
+    static const int SCREEN_W = 960;
+    static const int SCREEN_H = 544;
+    static const int BG_W = 928;
+    static const int BG_H = 793;
+    static const float BG_SCALE = 1.0f;
+    static const float BG_CROP_Y = 249.0f;
+    static const float layerScroll[] = {
+        0.0f, 0.3f, 0.5f, 0.5f, 0.7f, 0.8f,
+        0.8f, 0.85f, 0.9f, 1.0f, 1.0f
+    };
 
     if (parallaxEnabled) {
         if (backgroundTextures.size() != backgroundLayers.size()) {
@@ -275,6 +278,11 @@ void Scene::drawScene(Character &player, vita2d_texture *deadTexture, vita2d_tex
     } else {
         drawVision(SCREEN_W/2.0f,SCREEN_H/2.0f,player.health / max_health);
     }
+}
+
+// Drawn after the vision mask and any blur, so dialogue is never covered
+void Scene::drawDialogue(const Character &player, vita2d_pgf *font, vita2d_texture *crossButton) {
+    Interactable *activeInteractable = findActiveInteractable(player);
 
     if (activeInteractable && !pointClickEnabled && !activeInteractable->dialogue.active) {
         drawInteractPrompt(font, crossButton, activeInteractable->name.c_str());

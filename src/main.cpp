@@ -11,6 +11,7 @@
 #include <menu.h>
 #include <cmath>
 #include <world.h>
+#include <episode.h>
 #include <cstdio>
 
 static const int SCREEN_W = 960;
@@ -31,7 +32,7 @@ static const float PLAYER_SCALE = 2.5f; // scale the player up
 static const float WALK_SPEED    = 3.0f;  // px per frame
 static const float FADE_SECONDS  = 1.5f;
 static const float HEALTH_DECREASE_RATE = 0.005f; // Health decrease rate per frame
-static const float MOVEMENT_HEALTH_PENALTY = 10.0f; // Health penalty for moving
+static const float MOVEMENT_HEALTH_PENALTY = 0.02f; // Health penalty per frame while moving
 static const int DEATH_TIME_LIMIT = 600;
 
 static const int   BG_W      = 928;
@@ -512,6 +513,12 @@ int main(int argc, char *argv[]) {
 		}
 		cam_x = player.x - SCREEN_W / 2.0f;
 
+		player.health -= HEALTH_DECREASE_RATE;
+		if(player.health <= 0) {
+			player.health = 0;
+			player.state = Dead;
+		}
+
         // if (player.y < 0) player.y = 0;
         // if (player.y > SCREEN_H - FRAME_H * SPRITE_SCALE) player.y = SCREEN_H - FRAME_H * SPRITE_SCALE;
 
@@ -519,10 +526,30 @@ int main(int argc, char *argv[]) {
 
 		// DRAWING -----------------------------------------------------------------
 
-		vita2d_start_drawing();
-		vita2d_clear_screen();
+		// Heartbeat waits while any dialogue box is open
+		bool dialogueOpen = inventoryDialogue.active;
+		for (auto &dialogue : currentScene->dialogues) dialogueOpen = dialogueOpen || dialogue.active;
+		for (auto &interactable : currentScene->interactables) dialogueOpen = dialogueOpen || interactable.dialogue.active;
+		if (dialogueOpen) episodePause(EPISODE_PAUSE_DIALOGUE);
+		else episodeResume(EPISODE_PAUSE_DIALOGUE);
 
-		currentScene->drawScene(player, deadTexture, idleTexture, walkTexture, cam_x, GROUND_Y, defaultFont, cross_btn);
+		episodeUpdate(player.state != Dead);
+		if (episodeBlur() > 0.0f && episodeTarget()) {
+			// Draw the scene offscreen, then put it on screen blurred
+			vita2d_start_drawing_advanced(episodeTarget(), 0);
+			vita2d_clear_screen();
+			currentScene->drawScene(player, deadTexture, idleTexture, walkTexture, cam_x, GROUND_Y);
+			vita2d_end_drawing();
+
+			vita2d_start_drawing();
+			vita2d_clear_screen();
+			episodeDrawBlurred();
+		} else {
+			vita2d_start_drawing();
+			vita2d_clear_screen();
+			currentScene->drawScene(player, deadTexture, idleTexture, walkTexture, cam_x, GROUND_Y);
+		}
+		currentScene->drawDialogue(player, defaultFont, cross_btn);
 		if (inventoryOpen) {
 			drawInventoryPanel(player.inventory, defaultFont, selectedInventoryItem);
 			if (inventoryDialogue.active) {
@@ -548,6 +575,7 @@ int main(int argc, char *argv[]) {
 				previousScene = nullptr;
 				pendingScene = nullptr;
 				sceneTransitionPending = false;
+				episodeReset();
 				sceneFade.start(255.0f, 0.0f, FADE_SECONDS);
 			}
 			vita2d_start_drawing();
@@ -556,11 +584,6 @@ int main(int argc, char *argv[]) {
 			vita2d_pgf_draw_text(defaultFont, SCREEN_W / 2 - 100, SCREEN_H / 2, RGBA8(255, 0, 0, 255), 1.5f, "Game Over");
 			vita2d_end_drawing();
 			vita2d_swap_buffers();
-		}
-
-		player.health -= HEALTH_DECREASE_RATE;
-		if(player.health <= 0) {
-			player.state = Dead;
 		}
 
 		// ----------------------------------------------------------------- DRAWING
