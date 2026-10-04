@@ -1,4 +1,5 @@
 #include "vision.h"
+#include "episode.h"
 #include <vita2d.h>
 #include <math.h>
 
@@ -32,7 +33,8 @@ void drawVision(float cx, float cy, float healthFrac) {
     // Slow "heartbeat" pulse that speeds up as health drops
     ++frameCount;
     float pulse = 1.0f + 0.02f * sinf(frameCount * (0.05f + 0.10f * (1.0f - healthFrac)));
-    float R = shownR * pulse;
+    // Each heartbeat of an episode closes the vision mask in
+    float R = shownR * pulse * episodeVisionScale();
 
     float x0 = cx - R, y0 = cy - R, x1 = cx + R, y1 = cy + R;
 
